@@ -7,16 +7,18 @@
 
 param (
     [string]$workspaceName = "cp-repos",
-    [string]$branchName = "tf-naming-convention$(Get-Random -Maximum 400)",
+    [string]$branchName = "multireposync-$(Get-Random -Maximum 400)",
     [string]$prTitle = "Automated multi-repo update",
     [string]$prBody = "Automated change - please review the changed files"
 )
 
 $json = Get-Content ./$workspaceName.code-workspace | ConvertFrom-Json
 
+$env:GITHUB_TOKEN = "INSERT-GENERATED-JWT-FROM-PEM-HERE"
+
 $repoListTest = @(
     "wl-testteam1"
-    "flux-team1"
+    "wl-tstsp1"
 )
 $prList = @()
 $failedList = @()
@@ -39,15 +41,15 @@ function Checkout {
 
 function Commit {
     git -C $folder add .
-    git -C $folder commit -m "Updated reference for multiple repos"
+    git -C $folder commit -m "Updated file contents for multiple repos"
 }
 
 function Push {
     git -C $folder push
 }
 
-foreach ($folder in $($json.folders.path)) {
-    #foreach ($folder in $($repoListTest)) {
+#foreach ($folder in $($json.folders.path)) {
+foreach ($folder in $($repoListTest)) {
     
     #Checkout $folder
 
@@ -63,10 +65,11 @@ foreach ($folder in $($json.folders.path)) {
         Push
 
         if ($?) {
-            Set-Location $folder
+            #Set-Location $folder
+            $env:GH_REPO = "miljodir/$($folder)"
             $pr = gh pr create -b $branchName --title $prTitle --body $prBody
             $prList += $pr
-            Set-Location -
+            #Set-Location -
         }
         else {
             $failedList += $folder
@@ -74,7 +77,7 @@ foreach ($folder in $($json.folders.path)) {
         }
     }
     else {
-        Write-Output "Failed to auto-commit on branch $branchName for repo $folder ..."
+        Write-Output "Failed to automatically create PR on branch $branchName for repo $folder ..."
     }
 }
 
