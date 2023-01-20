@@ -15,9 +15,10 @@ function Checkout {
 }
 
 function Reset {
-    git reset --hard
-    git clean -fd
+    git -C $folder reset --hard
+    git -C $folder clean -fd
     git -C $folder checkout main
+    git -C $folder pull
 }
 
 
