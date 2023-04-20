@@ -8,7 +8,8 @@ $repoListTest = @(
     #"wl-tstsp1"
 )
 
-$branch = "cleanup-personal-kv-accesses"
+#$branch = "cleahnup-kv"
+$branch = "cleanup-current-kv-access2"
 
 function CheckoutNew {
     git -C $folder checkout -b $branch
@@ -23,7 +24,12 @@ function Reset {
 
 function Commit {
     git -C $folder add .
-    git -C $folder commit -m "Cleanup personaly kv accesses"
+    git -C $folder commit -m "Cleanup personal and owners kv accesses"
+
+}
+
+function CommitEmpty {
+    git -C $folder commit --allow-empty -m "Empty commit to retrigger TF Plan"
 
 }
 
@@ -38,10 +44,10 @@ function Push {
 function New-PR {
     gh api `
         --method POST `
-        -H "Accept: application/vnd.github.v3+json" -H "Authorization: Bearer $jwt" `
+        -H "Accept: application/vnd.github.v3+json" -H "Authorization: Bearer $env:jwt" `
         "/repos/miljodir/$folder/pulls" `
-        -f title='Multi-repo update: Remove personal and owner groups access to key vault in dev environment' `
-        -f body=-f body='Please review the changes and approve if everything seems alright. Access to manage these things should be done through AAD groups. Note the following: - access to current.user or Owners group is now granted through terraform for simplicity, access will be granted to the contributor group  - The removal of the `current` user access is replaced by the assignment occuring in the cp-yggdrasil repo.  - In 90% of cases, access to manage secrets will be sufficient, hence the lack of key/certificate rbac assignments' `
+        -f title='Multi-repo update: Remove .current, personal and owner groups access to keyvault' `
+        -f body='Please review the changes and approve if everything seems alright. Access to manage these things should be done through AAD groups. Note the following: - access to current.user or Owners group is now granted through terraform for simplicity. - The removal of the `current` user access is replaced by the assignment occuring in the cp-yggdrasil repo.  - In 90% of cases, access to manage secrets will be sufficient, hence the lack of key/certificate rbac assignments' `
         -f head=$branch `
         -f base='main' 
 }
@@ -56,7 +62,7 @@ function Patch-PR {
         --method PATCH `
         -H "Accept: application/vnd.github.v3+json" -H "Authorization: Bearer $env:jwt" `
         "/repos/miljodir/$folder/pulls/$prNumber" `
-        -f title='Multi-repo update: Remove personal and owner groups access to key vault in dev environment' `
+        -f title='Multi-repo update: Remove personal and owner groups access to key vault in test environment' `
         -f body='Please review the changes and approve if everything seems alright. Access to manage these things should be done through AAD groups. Note the following: - access to current.user or Owners group is now granted through terraform for simplicity, access will be granted to the contributor group  - The removal of the `current` user access is replaced by the assignment occuring in the cp-yggdrasil repo.  - In 90% of cases, access to manage secrets will be sufficient, hence the lack of key/certificate rbac assignments' `
         -f head=$branch `
         -f base='main' 
@@ -64,7 +70,7 @@ function Patch-PR {
 
 function Approve {
     cd $folder
-    gh pr review --approve -b "Automated approval, please double check changes and TF Plan before merging"
+    gh pr review --approve -b "Automated approval, please double check changes and TF Plan before merging. Do not merge before Monday/Tuesday to wait for complaints from dev envs"
     cd -
 }
 
@@ -101,25 +107,65 @@ function Pop {
     git -C $folder pop
 }
 
+function Difference {
+    $compare = (git -C $folder rev-parse head main)
+
+    if ($compare[0] -eq $compare[1]) {
+        return $false
+    }
+    else {
+        return $true
+    }
+}
+
+# foreach ($folder in $($json.folders.path)) {
+#     Reset
+#     CheckoutNew
+# }
+
+# foreach ($folder in $($json.folders.path)) {
+#     Commit
+#     Push
+# }
+
+
+# foreach ($folder in $($json.folders.path)) {
+#     Commit
+#     $diff = Difference
+
+#     if ($diff) {
+#         push
+#         New-PR
+#     }
+#     else {
+#         Write-Host "No changes detected for repo $folder..."
+#     }
+# }
+
+# foreach ($folder in $($json.folders.path)) {
+#     #Push
+#     Reset1
+#     Reset
+#     CheckoutExisting
+#     PullCurrent
+#     #Push
+# }
+
+# foreach ($folder in $($json.folders.path)) {
+#     CommitEmpty
+#     Push
+# }
+
 
 foreach ($folder in $($json.folders.path)) {
-    # foreach ($folder in $repoListTest) {
-    # Reset
-    # CheckoutExisting
-    # PullCurrent
-    # #CheckoutNew
-    # MergeMain
-    # RemoveConflict
-    # Commit
-    #Push
-    
-    # #if ($push.ToString() -ne "Everything up-to-date") {
-    #New-PR
-    #CheckoutExisting
-    #"PullCurrent
-    Patch-PR
-    # #}
-    #Approve
-    # #Merge
+    $diff = Difference
 
+    if ($diff) {
+        Write-Host "Found diff in $folder"
+        Approve
+        #Merge
+    }
+    else {
+        Write-Host "No changes detected for repo $folder"
+    }
 }
